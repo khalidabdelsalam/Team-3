@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backup-deployment
+  labels:
+    app: backup-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backup-service
+  template:
+    metadata:
+      labels:
+        app: backup-service
+    spec:
+      containers:
+      - name: backup-service
+        image: ghcr.io/username/backup-service:latest
+        ports:
+        - containerPort: 3001
+        envFrom:
+        - configMapRef:
+            name: backup-config
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3001
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backup-service
+spec:
+  selector:
+    app: backup-service
+  ports:
+    - protocol: TCP
+      port: 3001
+      targetPort: 3001
+  type: ClusterIP

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.backup.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  type: {{ .Values.backup.service.type }}
+  ports:
+  - port: {{ .Values.backup.service.port }}
+    targetPort: {{ .Values.backup.service.port }}
+    protocol: TCP
+  selector:
+    app: {{ .Values.backup.name }}

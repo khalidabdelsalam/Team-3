@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.backup.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.backup.name }}
+spec:
+  replicas: {{ .Values.backup.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.backup.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.backup.name }}
+    spec:
+      containers:
+      - name: {{ .Values.backup.name }}
+        image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
+        ports:
+        - containerPort: {{ .Values.backup.service.port }}
+        resources:
+          {{- toYaml .Values.backup.resources | nindent 10 }}
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.backup.name }}-secret
+              key: DB_PASSWORD
+        envFrom:
+        - configMapRef:
+            name: {{ .Values.backup.name }}-config
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: {{ .Values.backup.service.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.backup.service.port }}
+          initialDelaySeconds: 15
+          periodSeconds: 20

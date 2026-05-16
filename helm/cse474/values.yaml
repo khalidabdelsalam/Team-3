@@ -1,0 +1,139 @@
+# Default values for cse474.
+namespace: cse474-prod
+
+global:
+  imagePullPolicy: IfNotPresent
+
+analytics:
+  name: access-analytics-service
+  replicaCount: 2
+  image:
+    repository: ghcr.io/username/access-analytics-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3010
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+backup:
+  name: backup-service
+  replicaCount: 2
+  image:
+    repository: ghcr.io/username/backup-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3001
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+notification:
+  name: notification-service
+  replicaCount: 2
+  image:
+    repository: ghcr.io/username/notification-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3005
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+auth:
+  name: auth-service
+  replicaCount: 2
+  image:
+    repository: ghcr.io/username/auth-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3006
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+audit:
+  name: audit-service
+  replicaCount: 2
+  image:
+    repository: ghcr.io/username/audit-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3007
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+kafka:
+  broker: kafka:9092
+
+postgres:
+  analyticsHost: access-analytics-db
+  backupHost: backup-db
+  user: user
+  # password: password # Removed for security, should be passed via --set or secret替换为   user: user
+  # password: password # Removed for security, should be passed via --set or secret展开为   user: user
+  # password: password # Removed for security, should be passed via --set or secret
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: ds-proj.local
+      paths:
+        - path: /analytics
+          pathType: Prefix
+          serviceName: access-analytics-service
+          servicePort: 3010
+        - path: /backup
+          pathType: Prefix
+          serviceName: backup-service
+          servicePort: 3001
+        - path: /notify
+          pathType: Prefix
+          serviceName: notification-service
+          servicePort: 3005
+        - path: /auth
+          pathType: Prefix
+          serviceName: auth-service
+          servicePort: 3006
+        - path: /audit
+          pathType: Prefix
+          serviceName: audit-service
+          servicePort: 3007
