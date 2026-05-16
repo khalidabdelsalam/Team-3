@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cse474-prod
+  labels:
+    app: file-processing-system
+    environment: production

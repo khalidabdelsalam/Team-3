@@ -1,0 +1,82 @@
+namespace: cse474-prod
+
+previewService:
+  name: preview-service
+  image:
+    repository: m91011/preview-service
+    tag: latest
+    pullPolicy: Always
+  replicas: 2
+  port: 3001
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  hpa:
+    minReplicas: 2
+    maxReplicas: 6
+    cpuUtilization: 70
+  env:
+    thumbnailWidth: "256"
+    thumbnailHeight: "256"
+    cacheTtl: "3600"
+    kafkaGroupId: "preview-service-group"
+
+compressionService:
+  name: compression-service
+  image:
+    repository: m91011/compression-service
+    tag: latest
+    pullPolicy: Always
+  replicas: 2
+  port: 3002
+  resources:
+    requests:
+      cpu: "150m"
+      memory: "256Mi"
+    limits:
+      cpu: "600m"
+      memory: "512Mi"
+  hpa:
+    minReplicas: 2
+    maxReplicas: 8
+    cpuUtilization: 70
+  env:
+    defaultAlgorithm: "gzip"
+    maxFileSizeMb: "500"
+    largeFileThresholdMb: "10"
+    kafkaGroupId: "compression-service-group"
+
+# Shared infrastructure
+infrastructure:
+  kafkaBrokers: "kafka:9092"
+  redisUrl: "redis://redis:6379"
+  fileRegistryUrl: "http://file-registry:4000"
+  storageGwUrl: "http://storage-gateway:4001"
+  configUrl: "http://config-service:3005"
+  metricsUrl: "http://metrics-service:3005"
+
+# Database credentials (use Secrets in production)
+database:
+  preview:
+    host: "preview-db"
+    port: "5432"
+    name: "preview_db"
+    user: "postgres"
+    password: "postgres"
+  compression:
+    host: "compression-db"
+    port: "5432"
+    name: "compression_db"
+    user: "postgres"
+    password: "postgres"
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    preview: preview.cse474.local
+    compression: compression.cse474.local

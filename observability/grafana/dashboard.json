@@ -1,0 +1,121 @@
+{
+  "title": "CSE474 — Preview & Compression Services",
+  "uid": "cse474-dashboard",
+  "version": 1,
+  "schemaVersion": 38,
+  "tags": ["cse474", "microservices", "preview", "compression"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total HTTP Requests — Preview Service",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "sum(http_requests_total{service=\"preview-service\"})",
+        "legendFormat": "Total Requests"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "Total HTTP Requests — Compression Service",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "sum(http_requests_total{service=\"compression-service\"})",
+        "legendFormat": "Total Requests"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Request Latency p50/p95/p99 — Preview Service",
+      "type": "graph",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_ms_bucket{service=\"preview-service\"}[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_ms_bucket{service=\"preview-service\"}[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_ms_bucket{service=\"preview-service\"}[5m]))",
+          "legendFormat": "p99"
+        }
+      ],
+      "yaxes": [{ "format": "ms", "label": "Latency" }, {}]
+    },
+    {
+      "id": 4,
+      "title": "Request Latency p50/p95/p99 — Compression Service",
+      "type": "graph",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_ms_bucket{service=\"compression-service\"}[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_ms_bucket{service=\"compression-service\"}[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_ms_bucket{service=\"compression-service\"}[5m]))",
+          "legendFormat": "p99"
+        }
+      ],
+      "yaxes": [{ "format": "ms", "label": "Latency" }, {}]
+    },
+    {
+      "id": 5,
+      "title": "Error Rate — Both Services",
+      "type": "graph",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "rate(http_errors_total{service=\"preview-service\"}[5m])",
+          "legendFormat": "Preview Errors/s"
+        },
+        {
+          "expr": "rate(http_errors_total{service=\"compression-service\"}[5m])",
+          "legendFormat": "Compression Errors/s"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Previews Generated per Minute",
+      "type": "graph",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 6 },
+      "targets": [{
+        "expr": "rate(previews_generated_total[1m]) * 60",
+        "legendFormat": "Previews/min"
+      }]
+    },
+    {
+      "id": 7,
+      "title": "Redis Cache Hit Rate — Preview Service",
+      "type": "gauge",
+      "gridPos": { "x": 0, "y": 18, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "sum(preview_cache_hits_total) / sum(http_requests_total{service=\"preview-service\",route=\"/preview/:file_id\"}) * 100",
+        "legendFormat": "Cache Hit %"
+      }],
+      "options": { "minValue": 0, "maxValue": 100 }
+    },
+    {
+      "id": 8,
+      "title": "Compression Ratio Distribution",
+      "type": "graph",
+      "gridPos": { "x": 6, "y": 18, "w": 18, "h": 4 },
+      "targets": [{
+        "expr": "histogram_quantile(0.50, rate(compression_ratio_bucket[5m]))",
+        "legendFormat": "Median Ratio"
+      }]
+    }
+  ]
+}

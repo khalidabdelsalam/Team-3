@@ -1,0 +1,90 @@
+version: "3.9"
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Observability Stack
+#  Prometheus + Grafana + Jaeger + Loki
+#  Add this to your existing docker-compose.yml or run separately
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Prometheus — metrics collection ───────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    networks: [fpms]
+    restart: unless-stopped
+
+  # ── Grafana — dashboards and visualization ─────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    ports:
+      - "3300:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/dashboard.json:/var/lib/grafana/dashboards/cse474.json
+    networks: [fpms]
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # ── Jaeger — distributed tracing ──────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    container_name: jaeger
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4318:4318"     # OTLP HTTP endpoint (for OpenTelemetry)
+      - "6831:6831/udp" # Jaeger UDP
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    networks: [fpms]
+    restart: unless-stopped
+
+  # ── Loki — log aggregation ─────────────────────────────────────────────────
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks: [fpms]
+    restart: unless-stopped
+
+  # ── Promtail — log shipper (Docker logs → Loki) ────────────────────────────
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail
+    volumes:
+      - /var/log:/var/log
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yml
+    networks: [fpms]
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  fpms:
+    external: true
+    name: pm2_nodejs_final_fpms

@@ -1,0 +1,246 @@
+version: "3.9"
+
+services:
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks: [fpms]
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    networks: [fpms]
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks: [fpms]
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic file.uploaded          --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic file.deleted           --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic preview.generated      --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic preview.failed         --partitions 1 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic compression.completed  --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic compression.failed     --partitions 1 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic compression.requested  --partitions 3 --replication-factor 1
+      echo 'Kafka topics created!'
+      "
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    networks: [fpms]
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks: [fpms]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  preview-db:
+    image: postgres:16-alpine
+    container_name: preview-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: preview_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - preview_db_data:/var/lib/postgresql/data
+    networks: [fpms]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d preview_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  compression-db:
+    image: postgres:16-alpine
+    container_name: compression-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: compression_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - compression_db_data:/var/lib/postgresql/data
+    networks: [fpms]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d compression_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  file-registry:
+    build:
+      context: ./mock-services/file-registry
+    container_name: file-registry
+    ports:
+      - "4000:4000"
+    networks: [fpms]
+    restart: unless-stopped
+
+  storage-gateway:
+    build:
+      context: ./mock-services/storage-gateway
+    container_name: storage-gateway
+    ports:
+      - "4001:4001"
+    environment:
+      FILE_REGISTRY_URL: http://file-registry:4000
+    depends_on: [file-registry]
+    networks: [fpms]
+    restart: unless-stopped
+
+  config-service:
+    build:
+      context: ./mock-services/support
+    container_name: config-service
+    ports:
+      - "3005:3005"
+    environment:
+      PORT: "3005"
+    networks: [fpms]
+    restart: unless-stopped
+
+  metrics-service:
+    build:
+      context: ./mock-services/support
+    container_name: metrics-service
+    ports:
+      - "3007:3005"
+    environment:
+      PORT: "3005"
+    networks: [fpms]
+    restart: unless-stopped
+
+  preview-service:
+    build:
+      context: ./preview-service
+    container_name: preview-service
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: "3001"
+      SERVICE_NAME: preview-service
+      DB_HOST: preview-db
+      DB_PORT: "5432"
+      DB_NAME: preview_db
+      DB_USER: postgres
+      DB_PASS: postgres
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_GROUP_ID: preview-service-group
+      FILE_REGISTRY_URL: http://file-registry:4000
+      STORAGE_GW_URL: http://storage-gateway:4001
+      METRICS_URL: http://metrics-service:3005
+      THUMBNAIL_WIDTH: "256"
+      THUMBNAIL_HEIGHT: "256"
+      CACHE_TTL: "3600"
+    depends_on:
+      preview-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      file-registry:
+        condition: service_started
+      storage-gateway:
+        condition: service_started
+    networks: [fpms]
+    restart: unless-stopped
+
+  compression-service:
+    build:
+      context: ./compression-service
+    container_name: compression-service
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: "3002"
+      SERVICE_NAME: compression-service
+      DB_HOST: compression-db
+      DB_PORT: "5432"
+      DB_NAME: compression_db
+      DB_USER: postgres
+      DB_PASS: postgres
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_GROUP_ID: compression-service-group
+      FILE_REGISTRY_URL: http://file-registry:4000
+      STORAGE_GW_URL: http://storage-gateway:4001
+      CONFIG_URL: http://config-service:3005
+      METRICS_URL: http://metrics-service:3005
+      DEFAULT_ALGORITHM: gzip
+      MAX_FILE_SIZE_MB: "500"
+      LARGE_FILE_THRESHOLD_MB: "10"
+    depends_on:
+      compression-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      file-registry:
+        condition: service_started
+      storage-gateway:
+        condition: service_started
+      config-service:
+        condition: service_started
+    networks: [fpms]
+    restart: unless-stopped
+
+volumes:
+  preview_db_data:
+  compression_db_data:
+
+networks:
+  fpms:
+    driver: bridge

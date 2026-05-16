@@ -1,0 +1,13 @@
+apiVersion: v2
+name: cse474
+description: File Processing & Management System - Preview & Compression Services
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - microservices
+  - file-processing
+  - preview
+  - compression
+maintainers:
+  - name: CSE474 Team

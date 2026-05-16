@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.compressionService.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.compressionService.name }}
+spec:
+  replicas: {{ .Values.compressionService.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.compressionService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.compressionService.name }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: {{ .Values.compressionService.port | quote }}
+    spec:
+      containers:
+        - name: {{ .Values.compressionService.name }}
+          image: "{{ .Values.compressionService.image.repository }}:{{ .Values.compressionService.image.tag }}"
+          imagePullPolicy: {{ .Values.compressionService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.compressionService.port }}
+          resources:
+            requests:
+              cpu: {{ .Values.compressionService.resources.requests.cpu | quote }}
+              memory: {{ .Values.compressionService.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.compressionService.resources.limits.cpu | quote }}
+              memory: {{ .Values.compressionService.resources.limits.memory | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.compressionService.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{ .Values.compressionService.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          envFrom:
+            - configMapRef:
+                name: services-config
+          env:
+            - name: PORT
+              value: {{ .Values.compressionService.port | quote }}
+            - name: SERVICE_NAME
+              value: {{ .Values.compressionService.name | quote }}
+            - name: KAFKA_GROUP_ID
+              value: {{ .Values.compressionService.env.kafkaGroupId | quote }}
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: COMPRESSION_DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: COMPRESSION_DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: COMPRESSION_DB_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: COMPRESSION_DB_USER
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: COMPRESSION_DB_PASS
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.compressionService.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.compressionService.name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Values.compressionService.name }}
+  ports:
+    - port: {{ .Values.compressionService.port }}
+      targetPort: {{ .Values.compressionService.port }}
+      protocol: TCP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Values.compressionService.name }}-hpa
+  namespace: {{ .Values.namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.compressionService.name }}
+  minReplicas: {{ .Values.compressionService.hpa.minReplicas }}
+  maxReplicas: {{ .Values.compressionService.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.compressionService.hpa.cpuUtilization }}

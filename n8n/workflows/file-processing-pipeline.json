@@ -1,0 +1,177 @@
+{
+  "name": "CSE474 — File Processing Automation Pipeline",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {
+        "path": "file-uploaded",
+        "method": "POST",
+        "responseMode": "onReceived",
+        "responseData": "allEntries"
+      },
+      "notes": "Entry point — receives file.uploaded event from Upload Service or Kafka"
+    },
+    {
+      "id": "2",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst body = item.json;\n\nif (!body.file_id) {\n  throw new Error('Missing file_id in payload');\n}\n\nconsole.log('[n8n] Processing file:', body.file_id);\nreturn [{ json: { file_id: body.file_id, algorithm: body.algorithm || 'gzip', timestamp: new Date().toISOString() } }];"
+      }
+    },
+    {
+      "id": "3",
+      "name": "Trigger Preview Generation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [650, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "http://preview-service:3001/preview/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{ "name": "file_id", "value": "={{ $json.file_id }}" }]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "notes": "Calls Preview Service REST API — POST /preview/generate"
+    },
+    {
+      "id": "4",
+      "name": "Trigger Compression",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [650, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "http://compression-service:3002/compress",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "file_id", "value": "={{ $json.file_id }}" },
+            { "name": "algorithm", "value": "={{ $json.algorithm }}" }
+          ]
+        },
+        "options": { "timeout": 60000 }
+      },
+      "notes": "Calls Compression Service REST API — POST /compress"
+    },
+    {
+      "id": "5",
+      "name": "Check Preview Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 200],
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.success }}", "value2": true }]
+        }
+      }
+    },
+    {
+      "id": "6",
+      "name": "Check Compression Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 400],
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.success }}", "value2": true }]
+        }
+      }
+    },
+    {
+      "id": "7",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [1050, 300],
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByIndex"
+      },
+      "notes": "Merge preview and compression results into one payload"
+    },
+    {
+      "id": "8",
+      "name": "Build Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst summary = {\n  file_id: items[0]?.json?.data?.file_id || 'unknown',\n  preview_url: items[0]?.json?.data?.preview_url || null,\n  compression_job_id: items[1]?.json?.data?.job_id || null,\n  compression_ratio: items[1]?.json?.data?.ratio || null,\n  pipeline_status: 'completed',\n  processed_at: new Date().toISOString()\n};\nconsole.log('[n8n] Pipeline complete:', JSON.stringify(summary));\nreturn [{ json: summary }];"
+      }
+    },
+    {
+      "id": "9",
+      "name": "Notify Success",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1450, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "http://metrics-service:3005/metrics",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "service", "value": "n8n-pipeline" },
+            { "name": "name", "value": "pipeline.completed" },
+            { "name": "value", "value": "1" }
+          ]
+        }
+      },
+      "notes": "Report pipeline completion to Metrics Service"
+    },
+    {
+      "id": "10",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 500],
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nconsole.error('[n8n] Pipeline error:', JSON.stringify(error));\nreturn [{ json: { status: 'failed', error: error, timestamp: new Date().toISOString() } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": { "main": [[{ "node": "Validate Payload", "type": "main", "index": 0 }]] },
+    "Validate Payload": {
+      "main": [
+        [{ "node": "Trigger Preview Generation", "type": "main", "index": 0 }],
+        [{ "node": "Trigger Compression", "type": "main", "index": 0 }]
+      ]
+    },
+    "Trigger Preview Generation": { "main": [[{ "node": "Check Preview Success", "type": "main", "index": 0 }]] },
+    "Trigger Compression": { "main": [[{ "node": "Check Compression Success", "type": "main", "index": 0 }]] },
+    "Check Preview Success": {
+      "main": [
+        [{ "node": "Merge Results", "type": "main", "index": 0 }],
+        [{ "node": "Log Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Compression Success": {
+      "main": [
+        [{ "node": "Merge Results", "type": "main", "index": 1 }],
+        [{ "node": "Log Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Merge Results": { "main": [[{ "node": "Build Summary", "type": "main", "index": 0 }]] },
+    "Build Summary": { "main": [[{ "node": "Notify Success", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": true
+}

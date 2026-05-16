@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: services-config
+  namespace: {{ .Values.namespace }}
+data:
+  KAFKA_BROKERS: {{ .Values.infrastructure.kafkaBrokers | quote }}
+  REDIS_URL: {{ .Values.infrastructure.redisUrl | quote }}
+  FILE_REGISTRY_URL: {{ .Values.infrastructure.fileRegistryUrl | quote }}
+  STORAGE_GW_URL: {{ .Values.infrastructure.storageGwUrl | quote }}
+  CONFIG_URL: {{ .Values.infrastructure.configUrl | quote }}
+  METRICS_URL: {{ .Values.infrastructure.metricsUrl | quote }}
+  THUMBNAIL_WIDTH: {{ .Values.previewService.env.thumbnailWidth | quote }}
+  THUMBNAIL_HEIGHT: {{ .Values.previewService.env.thumbnailHeight | quote }}
+  CACHE_TTL: {{ .Values.previewService.env.cacheTtl | quote }}
+  DEFAULT_ALGORITHM: {{ .Values.compressionService.env.defaultAlgorithm | quote }}
+  MAX_FILE_SIZE_MB: {{ .Values.compressionService.env.maxFileSizeMb | quote }}
+  LARGE_FILE_THRESHOLD_MB: {{ .Values.compressionService.env.largeFileThresholdMb | quote }}
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-secrets
+  namespace: {{ .Values.namespace }}
+type: Opaque
+stringData:
+  PREVIEW_DB_HOST: {{ .Values.database.preview.host | quote }}
+  PREVIEW_DB_PORT: {{ .Values.database.preview.port | quote }}
+  PREVIEW_DB_NAME: {{ .Values.database.preview.name | quote }}
+  PREVIEW_DB_USER: {{ .Values.database.preview.user | quote }}
+  PREVIEW_DB_PASS: {{ .Values.database.preview.password | quote }}
+  COMPRESSION_DB_HOST: {{ .Values.database.compression.host | quote }}
+  COMPRESSION_DB_PORT: {{ .Values.database.compression.port | quote }}
+  COMPRESSION_DB_NAME: {{ .Values.database.compression.name | quote }}
+  COMPRESSION_DB_USER: {{ .Values.database.compression.user | quote }}
+  COMPRESSION_DB_PASS: {{ .Values.database.compression.password | quote }}

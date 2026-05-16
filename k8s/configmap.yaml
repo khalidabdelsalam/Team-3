@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: services-config
+  namespace: cse474-prod
+data:
+  # Preview Service
+  PREVIEW_PORT: "3001"
+  PREVIEW_SERVICE_NAME: "preview-service"
+  THUMBNAIL_WIDTH: "256"
+  THUMBNAIL_HEIGHT: "256"
+  CACHE_TTL: "3600"
+
+  # Compression Service
+  COMPRESSION_PORT: "3002"
+  COMPRESSION_SERVICE_NAME: "compression-service"
+  DEFAULT_ALGORITHM: "gzip"
+  MAX_FILE_SIZE_MB: "500"
+  LARGE_FILE_THRESHOLD_MB: "10"
+
+  # Shared infrastructure URLs (internal cluster DNS)
+  KAFKA_BROKERS: "kafka:9092"
+  REDIS_URL: "redis://redis:6379"
+  FILE_REGISTRY_URL: "http://file-registry:4000"
+  STORAGE_GW_URL: "http://storage-gateway:4001"
+  CONFIG_URL: "http://config-service:3005"
+  METRICS_URL: "http://metrics-service:3005"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-secrets
+  namespace: cse474-prod
+type: Opaque
+stringData:
+  PREVIEW_DB_USER: "postgres"
+  PREVIEW_DB_PASS: "postgres"
+  PREVIEW_DB_NAME: "preview_db"
+  PREVIEW_DB_HOST: "preview-db"
+  PREVIEW_DB_PORT: "5432"
+
+  COMPRESSION_DB_USER: "postgres"
+  COMPRESSION_DB_PASS: "postgres"
+  COMPRESSION_DB_NAME: "compression_db"
+  COMPRESSION_DB_HOST: "compression-db"
+  COMPRESSION_DB_PORT: "5432"

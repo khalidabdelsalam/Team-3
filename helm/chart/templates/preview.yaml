@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.previewService.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.previewService.name }}
+spec:
+  replicas: {{ .Values.previewService.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.previewService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.previewService.name }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: {{ .Values.previewService.port | quote }}
+    spec:
+      containers:
+        - name: {{ .Values.previewService.name }}
+          image: "{{ .Values.previewService.image.repository }}:{{ .Values.previewService.image.tag }}"
+          imagePullPolicy: {{ .Values.previewService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.previewService.port }}
+          resources:
+            requests:
+              cpu: {{ .Values.previewService.resources.requests.cpu | quote }}
+              memory: {{ .Values.previewService.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.previewService.resources.limits.cpu | quote }}
+              memory: {{ .Values.previewService.resources.limits.memory | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.previewService.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{ .Values.previewService.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          envFrom:
+            - configMapRef:
+                name: services-config
+          env:
+            - name: PORT
+              value: {{ .Values.previewService.port | quote }}
+            - name: SERVICE_NAME
+              value: {{ .Values.previewService.name | quote }}
+            - name: KAFKA_GROUP_ID
+              value: {{ .Values.previewService.env.kafkaGroupId | quote }}
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: PREVIEW_DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: PREVIEW_DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: PREVIEW_DB_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: PREVIEW_DB_USER
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: PREVIEW_DB_PASS
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.previewService.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.previewService.name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Values.previewService.name }}
+  ports:
+    - port: {{ .Values.previewService.port }}
+      targetPort: {{ .Values.previewService.port }}
+      protocol: TCP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Values.previewService.name }}-hpa
+  namespace: {{ .Values.namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.previewService.name }}
+  minReplicas: {{ .Values.previewService.hpa.minReplicas }}
+  maxReplicas: {{ .Values.previewService.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.previewService.hpa.cpuUtilization }}
