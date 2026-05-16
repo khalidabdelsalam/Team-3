@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.analytics.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.analytics.name }}
+spec:
+  replicas: {{ .Values.analytics.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.analytics.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.analytics.name }}
+    spec:
+      containers:
+      - name: {{ .Values.analytics.name }}
+        image: "{{ .Values.analytics.image.repository }}:{{ .Values.analytics.image.tag }}"
+        ports:
+        - containerPort: {{ .Values.analytics.service.port }}
+        resources:
+          {{- toYaml .Values.analytics.resources | nindent 10 }}
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.analytics.name }}-secret
+              key: DB_PASSWORD
+        envFrom:
+        - configMapRef:
+            name: {{ .Values.analytics.name }}-config
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: {{ .Values.analytics.service.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.analytics.service.port }}
+          initialDelaySeconds: 15
+          periodSeconds: 20

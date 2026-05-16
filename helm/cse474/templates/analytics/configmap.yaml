@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.analytics.name }}-config
+  namespace: {{ .Values.namespace }}
+data:
+  PORT: {{ .Values.analytics.service.port | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4318/v1/traces"
+  DB_USER: {{ .Values.postgres.user | quote }}
+  ANALYTICS_DB_HOST: {{ .Values.postgres.analyticsHost | quote }}
+  KAFKA_BROKER: {{ .Values.kafka.broker | quote }}
