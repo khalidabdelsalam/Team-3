@@ -1,0 +1,28 @@
+{
+  "name": "@cse474/notification-service",
+  "version": "1.0.0",
+  "description": "Notification microservice for the distributed storage platform",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "pm2": "pm2-runtime start ecosystem.config.cjs",
+    "migrate": "node src/db/migrate.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "kafkajs": "^2.2.4",
+    "pm2": "^5.4.3",
+    "pg": "^8.13.1",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.0",
+    "vitest": "^2.1.8"
+  }
+}
