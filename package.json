@@ -1,0 +1,58 @@
+{
+  "name": "webhook-service",
+  "version": "1.0.0",
+  "description": "Kafka-driven webhook delivery microservice with MongoDB persistence, Docker, and PM2 support.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "lint": "eslint .",
+    "test": "jest --runInBand",
+    "test:unit": "jest --runInBand tests/unit",
+    "test:integration": "jest --runInBand tests/integration",
+    "test:coverage": "jest --runInBand --coverage --coverageDirectory=tests/coverage",
+    "pm2:start": "pm2-runtime ecosystem.config.js --env production",
+    "smoke": "node scripts/smoke-test.js"
+  },
+  "keywords": [
+    "webhook",
+    "microservice",
+    "kafka",
+    "mongodb",
+    "pm2",
+    "docker"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.2",
+    "@opentelemetry/sdk-node": "^0.57.2",
+    "axios": "^1.8.4",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "kafkajs": "^2.2.4",
+    "mongoose": "^8.3.4",
+    "pm2": "^5.4.2",
+    "prom-client": "^15.1.3",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "tests/coverage",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/server.js",
+      "!src/tracing.js"
+    ]
+  }
+}

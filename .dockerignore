@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log*
+.git
+.gitignore
+README.md
+mock-receiver/node_modules
+.env
+tests/coverage
